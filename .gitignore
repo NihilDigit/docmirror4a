@@ -1,0 +1,10 @@
+# Mirror generated content is kept in each working directory, not in this repo.
+**/pages/
+**/assets/
+**/metadata/
+**/shell/
+**/upstream/
+**/manifest.json
+**/__pycache__/
+*.bak
+*.part
