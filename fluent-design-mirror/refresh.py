@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import hashlib
+import http.client
 import html
 import json
 import mimetypes
@@ -23,7 +24,7 @@ import time
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qsl, unquote, urljoin, urlparse
+from urllib.parse import parse_qsl, quote, unquote, urljoin, urlparse
 from urllib.request import Request, urlopen
 
 
@@ -47,6 +48,11 @@ def fetch(url: str, *, accept: str = "*/*", attempts: int = 4) -> tuple[bytes, d
     """Fetch a public resource with bounded retries and a polite user agent."""
 
     last_error: Exception | None = None
+    # Site asset paths occasionally contain raw spaces (e.g. `/cdn/Card Image-1....png`);
+    # percent-encode the path so http.client does not raise InvalidURL. "%" stays
+    # safe to avoid double-encoding already-escaped segments.
+    parts = urlparse(url)
+    url = parts._replace(path=quote(parts.path, safe="/%")).geturl()
     for attempt in range(attempts):
         request = Request(url, headers={"Accept": accept, "User-Agent": USER_AGENT})
         try:
@@ -62,7 +68,7 @@ def fetch(url: str, *, accept: str = "*/*", attempts: int = 4) -> tuple[bytes, d
             except ValueError:
                 delay = 2.0 ** attempt
             time.sleep(delay)
-        except (URLError, TimeoutError, OSError) as error:
+        except (URLError, TimeoutError, OSError, http.client.HTTPException) as error:
             last_error = error
             time.sleep(min(30.0, 2.0 ** attempt))
     raise FetchFailure(url, str(last_error or "unknown fetch error"))
@@ -514,8 +520,8 @@ def download_asset(url: str, kind: str, out: Path) -> dict:
         record["bytes"] = len(data)
         record["sha256"] = sha256(data)
         record["content_type"] = headers.get("content-type", "")
-    except FetchFailure as error:
-        record["error"] = str(error)
+    except Exception as error:  # one bad asset must not kill the run; recorded in metadata/assets.json
+        record["error"] = f"{type(error).__name__}: {error}"
     return record
 
 

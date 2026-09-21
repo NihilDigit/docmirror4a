@@ -14,6 +14,7 @@ import argparse
 import concurrent.futures
 import gzip
 import hashlib
+import http.client
 import html
 import json
 import mimetypes
@@ -200,7 +201,7 @@ def fetch(
             except (TypeError, ValueError):
                 delay = 2.0**attempt
             time.sleep(delay)
-        except (URLError, TimeoutError, OSError) as error:
+        except (URLError, TimeoutError, OSError, http.client.HTTPException) as error:
             last_error = error
             time.sleep(min(30.0, 2.0**attempt))
     status = getattr(last_error, "code", None)
@@ -1039,18 +1040,19 @@ class Mirror:
         return True
 
     def save_state(self, also_queued: Iterable[str] = ()) -> None:
-        write_json(
-            self.state_path(),
-            {
+        # Worker threads keep mutating these structures while a checkpoint is
+        # taken, so snapshot them under the lock and write the file outside it.
+        with self.lock:
+            snapshot = {
                 "saved_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                "queue": self.queue + [path for path in also_queued],
+                "queue": list(self.queue) + [path for path in also_queued],
                 "seen": sorted(self.seen),
-                "pages": [self.page_records[path] for path in sorted(self.page_records)],
-                "failures": self.failures,
+                "pages": [dict(self.page_records[path]) for path in sorted(self.page_records)],
+                "failures": [dict(item) for item in self.failures],
                 "images": sorted(self.image_urls),
-                "validators": self.validators,
-            },
-        )
+                "validators": {key: dict(value) for key, value in self.validators.items()},
+            }
+        write_json(self.state_path(), snapshot)
 
     def crawl(self) -> None:
         resumed = self.load_state()

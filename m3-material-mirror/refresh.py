@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import hashlib
+import http.client
 import html
 import json
 import mimetypes
@@ -74,7 +75,7 @@ def fetch(url: str, *, accept: str = "*/*", attempts: int = 4) -> tuple[bytes, d
             except ValueError:
                 delay = 2.0 ** attempt
             time.sleep(delay)
-        except (URLError, TimeoutError, OSError) as error:
+        except (URLError, TimeoutError, OSError, http.client.HTTPException) as error:
             last_error = error
             time.sleep(min(30.0, 2.0 ** attempt))
     raise FetchFailure(url, str(last_error or "unknown fetch error"))
