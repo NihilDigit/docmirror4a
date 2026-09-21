@@ -8,6 +8,7 @@
 | --- | --- | --- |
 | `android-docs-mirror/` | Android 开发者文档 | 镜像 Android developer 文档 |
 | `kotlin-docs-mirror/` | Kotlin 文档 | 镜像 Kotlin 语言文档 |
+| `kmp-docs-mirror/` | Kotlin Multiplatform 文档 | 镜像 KMP 指南、Compose Multiplatform 与其 API 参考 |
 | `m3-material-mirror/` | m3.material.io | 镜像 Material 3 设计资料 |
 | `fluent-design-mirror/` | fluent2.microsoft.design | 镜像 Fluent 2 设计系统资料 |
 
